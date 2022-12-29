@@ -1,9 +1,13 @@
-# Kubernetes Pressure Cooker
+# Kubernetes Multi Cooker
+Automatically taint and evict nodes with high CPU overload based on chosen Metric PSI or Avarage Load. Derived from [kubernetes-loadwatcher](https://github.com/mittwald/kubernetes-loadwatcher).
 
-Automatically taint and evict nodes with high CPU overload. Derived from [kubernetes-loadwatcher](https://github.com/mittwald/kubernetes-loadwatcher).
+This actually started as a small extension of [kubernetes-pressurecooker](https://github.com/rtreffer/kubernetes-pressurecooker) just to do the job.But there were popping more and more things that we needed. It became multicooker once we tried to move with it to GKE and we hit a wall with it. Because google have quite a bit of different kernels on their machines. Some of them has PSI others doesnt.
 
 The load average describes the average length of the run queue whenever a scheduling decision is made. But it does not tell us how often processes were waiting for CPU time.
 The [kernel pressure metrics (psi by facebook)](https://facebookmicrosites.github.io/psi/docs/overview.html#pressure-metric-definitions) describes how often there was not enough CPU available.
+
+There some big clound providers that doesnt support PSI metrics out of the box. I'm looking at you Google
+That is why there is a flag  `-use-avarage` to choose load avarage metrics.
 
 ## Synopsis
 
@@ -18,11 +22,16 @@ Pressure is more sensitive for small overloads, e.g. with pressure information i
 ## How it works
 
 This controller can be started with two threshold flags: `-taint-threshold` and `-evict-threshold`. There are also safeguard flags `-min-pod-age` and `-eviction-backoff`.
+There are also few configuration flags 
+Use`-use-avarage` to choose load avarage metrics instead of PSI.
+Use `-target-metric` to choose the metric that will be a good fit to use for the threshold. 
+Possible values are 1,2,3 based on the metric type. For LoadAva this will be [Load1, Load5,Load15] respectively for PSI it will be [Avg10,Avg60,Avg300]
 The controller will continuously monitor a node's CPU pressure.
 
-- If the CPU pressure (5min average) exceeds the _taint threshold_, the node will be tainted with a `pressurecooker/load-exceeded` taint with the `PreferNoSchedule` effect. This will instruct Kubernetes to not schedule any additional workloads on this node if at all possible.
-- If the CPU load (both 5min and 15min average) falls back below the _taint threshold_, the taint will be removed again.
-- If the CPU load (15 min average) exceeds the _eviction threshold_, the controller will pick a suitable Pod running on the node and evict it. However, the following types of Pods will _not_ be evicted:
+- If the target-metric exceeds the _taint threshold_, the node will be tainted with a `multicooker/load-exceeded` taint with the `PreferNoSchedule` effect. This will instruct Kubernetes to not schedule any additional workloads on this node if at all possible.
+- Once node is tainted target metric is moved to the first one so the controller will be more reactive.
+- If the ALL the metrics falls back below the _taint threshold_, the taint will be removed again.
+- If the the FIRST Metric (Load1 Avg10) exceeds the _eviction threshold_, the controller will pick a suitable Pod running on the node and evict it. However, the following types of Pods will _not_ be evicted:
 
     - Pods with the `Guaranteed` QoS class
     - Pods belonging to Stateful Sets
@@ -31,9 +40,20 @@ The controller will continuously monitor a node's CPU pressure.
     - Pods running in the `kube-system` namespace or with a critical `priorityClassName`
     - Pods newer than _min-pod-age_
     
-After a Pod was evicted, the next Pod will be evicted after a configurable _eviction backoff_ (controllable using the `evict-backoff` argument) if the load15 is still above the _eviction threshold_.
+After a Pod was evicted, the next Pod will be evicted after a configurable _eviction backoff_ (controllable using the `evict-backoff` argument) if the FIRST Metric (Load1 Avg10) is still above the _eviction threshold_.
 
 Older pods will be evicted first.
 The ration to remove old pods first is tat it is usually better to move well behaving pods away from bad neighbors
 than moving bad neighbors through the cluster. And as a node will always stay in a healthy state it can be assumed
 that the older pods are less likely to be the cause of an overload.
+
+## Installation
+
+There is a helm chart in the repo.
+To install from repo folder:
+
+`helm upgrade --install --namespace kube-system kubernetes-multicooker chart/`
+## TODO
+
+- Create tests
+- Fix prometheus metrics to be per node- release 1.0.2

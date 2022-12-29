@@ -1,17 +1,16 @@
-FROM golang:1.14 AS builder
+FROM golang:1.18-bullseye AS builder
 
 COPY . /work
 WORKDIR /work
-RUN useradd pressurecooker
-RUN cd /work ; go build -o kubernetes-pressurecooker cmd/main.go
+RUN useradd multicooker
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app/multicooker cmd/main.go
 
-FROM scratch
+FROM  alpine
 
-LABEL MAINTAINER="Rene Treffer <treffer+github@measite.de>"
-COPY --from=builder /work/kubernetes-pressurecooker /usr/bin/kubernetes-pressurecooker
+COPY  --from=builder /work/app/multicooker /usr/sbin/multicooker
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/
+RUN chmod 777 /tmp/
+USER multicooker
 
-USER pressurecooker
-
-ENTRYPOINT ["/usr/bin/kubernetes-pressurecooker", "-logtostderr"]
+ENTRYPOINT ["/usr/sbin/multicooker", "-logtostderr"]

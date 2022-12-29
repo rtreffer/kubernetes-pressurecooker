@@ -8,4 +8,6 @@ type StartupFlags struct {
 	MinPodAge      string
 	NodeName       string
 	MetricsPort    int
+	TargetMetric   int
+	UseAvarage     bool
 }

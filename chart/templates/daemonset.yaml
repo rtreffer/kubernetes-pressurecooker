@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "chart.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "chart.name" . }}
+    helm.sh/chart: {{ include "chart.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "chart.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "chart.name"  . }}
+        chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+        release: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "chart.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}
+      priorityClassName : system-node-critical
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: metrics
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          args:
+            - -node-name=$(NODE_NAME)
+            {{- if .Values.taintThreshold }}
+            - -taint-threshold={{ .Values.taintThreshold }}
+            {{- end }}
+            {{- if .Values.evictThreshold }}
+            - -evict-threshold={{ .Values.evictThreshold }}
+            {{- end }}
+            - -evict-backoff={{ .Values.evictBackoff }}
+            - -v=8
+            {{- if .Values.metricsPort }}
+            - -metrics-port={{ .Values.metricsPort }}
+            {{- end }}
+            - -use-avarage={{ .Values.useAverage }}
+            {{- if .Values.targetMetric }}
+            - -target-metric={{ .Values.targetMetric }}
+            {{- end }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      tolerations:
+        - key: multicooker/load-exceeded
+          operator: Exists
+          effect: NoSchedule
+        {{- with .Values.tolerations }}
+{{ toYaml . | indent 8 }}
+        {{- end }}

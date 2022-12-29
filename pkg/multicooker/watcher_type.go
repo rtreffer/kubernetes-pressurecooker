@@ -1,4 +1,4 @@
-package pressurecooker
+package multicooker
 
 import (
 	"time"
@@ -6,7 +6,11 @@ import (
 	"github.com/prometheus/procfs"
 )
 
-type PressureThresholdEvent procfs.PSILine
+type PressureThresholdEvent struct {
+	Message         string
+	MeticValue      float64
+	IsCurrentlyHigh bool
+}
 
 type Watcher struct {
 	TickerInterval    time.Duration
@@ -14,9 +18,10 @@ type Watcher struct {
 
 	proc            procfs.FS
 	isCurrentlyHigh bool
+	nodeName        string
 }
 
-func NewWatcher(pressureThreshold float64) (*Watcher, error) {
+func NewWatcher(pressureThreshold float64, nodeName string) (*Watcher, error) {
 	if pressureThreshold == 0 {
 		pressureThreshold = 25
 	}
@@ -30,5 +35,6 @@ func NewWatcher(pressureThreshold float64) (*Watcher, error) {
 		PressureThreshold: pressureThreshold,
 		TickerInterval:    15 * time.Second,
 		proc:              fs,
+		nodeName:          nodeName,
 	}, nil
 }

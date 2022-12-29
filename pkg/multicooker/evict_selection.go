@@ -1,4 +1,4 @@
-package pressurecooker
+package multicooker
 
 import (
 	"math"

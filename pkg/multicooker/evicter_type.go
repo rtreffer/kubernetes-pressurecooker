@@ -1,4 +1,4 @@
-package pressurecooker
+package multicooker
 
 import (
 	"time"
@@ -14,7 +14,6 @@ import (
 
 type Evicter struct {
 	client       kubernetes.Interface
-	threshold    float64
 	nodeName     string
 	nodeRef      *v1.ObjectReference
 	recorder     record.EventRecorder
@@ -23,10 +22,7 @@ type Evicter struct {
 	lastEviction time.Time
 }
 
-func NewEvicter(client kubernetes.Interface, threshold float64, nodeName string, backoff string, minPodAge string) (*Evicter, error) {
-	if threshold == 0 {
-		threshold = 50
-	}
+func NewEvicter(client kubernetes.Interface, nodeName string, backoff string, minPodAge string) (*Evicter, error) {
 
 	backoffDuration, err := time.ParseDuration(backoff)
 	if err != nil {
@@ -55,7 +51,6 @@ func NewEvicter(client kubernetes.Interface, threshold float64, nodeName string,
 
 	return &Evicter{
 		client:    client,
-		threshold: threshold,
 		nodeName:  nodeName,
 		nodeRef:   nodeRef,
 		recorder:  r,
